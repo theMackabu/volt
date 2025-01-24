@@ -1,0 +1,6 @@
+volt_id = "eb982eb8-8638-4e19-b6fe-978d3bc41449"
+
+[settings]
+tls = false
+cache = ["target"]
+wrap = "cargo build --release"

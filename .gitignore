@@ -1,7 +1,6 @@
 /target
 
 # testing configs
-volt.toml
 config.toml
 
 # extra binaries
