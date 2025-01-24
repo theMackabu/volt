@@ -96,7 +96,6 @@ impl Services {
 
         pb.set_style(style);
         pb.enable_steady_tick(std::time::Duration::from_millis(80));
-        pb.set_message("Downloading archive...");
 
         let response = match self.client.get(&url).header("Authorization", format!("Bearer {}", token)).send().await {
             Ok(next) => next,
@@ -111,7 +110,7 @@ impl Services {
             return Err(anyhow!(response.status()));
         }
 
-        pb.set_message("Decompressing...");
+        pb.set_message("Downloading archive...");
 
         let compressed = response.bytes().await?;
         let decoder = zstd::stream::decode_all(&*compressed)?;
