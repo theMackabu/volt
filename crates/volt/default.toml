@@ -1,0 +1,7 @@
+# server = "token@example.tld:port"
+volt_id = "{volt_id}"
+
+[config]
+# tls = false
+# cache = ["target"]
+# wrap = "cargo build --release"
