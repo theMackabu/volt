@@ -1,5 +1,5 @@
-# server = "token@example.tld:port"
 volt_id = "{volt_id}"
+# server = "token@example.tld:port"
 
 [config]
 # tls = false
