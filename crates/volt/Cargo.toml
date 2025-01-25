@@ -1,5 +1,5 @@
 [package]
-name = "volt"
+name = "volt-cli"
 license.workspace = true
 edition.workspace = true
 version.workspace = true
