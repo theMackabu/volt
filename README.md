@@ -12,7 +12,7 @@ A blazingly fast build cache server and CLI tool written in Rust. Volt helps you
 
 ## Usage
 
-Just type `volt` to generate the initial config, fill out the details, and you are set!
+Just type `volt` to generate the initial config, fill out the details, then create a new server using `volt server` and you are set!
 
 - Manually push cache just
   `volt push`
