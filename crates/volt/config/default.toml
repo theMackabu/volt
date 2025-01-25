@@ -1,6 +1,6 @@
 volt_id = "{volt_id}"
 
-[config]
+[settings]
 # server = "name"
 # cache = ["target"]
 # wrap = "cargo build --release"
