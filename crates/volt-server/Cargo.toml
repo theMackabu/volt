@@ -1,5 +1,7 @@
 [package]
 name = "volt-server"
+description = "Server for crates.io/crate/volt-cli"
+
 license.workspace = true
 edition.workspace = true
 version.workspace = true

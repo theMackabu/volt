@@ -1,5 +1,7 @@
 [package]
 name = "volt-cli"
+description = "⚡ Simple and lightning fast caching for... anything"
+
 license.workspace = true
 edition.workspace = true
 version.workspace = true
