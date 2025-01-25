@@ -4,7 +4,7 @@ mod config;
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use config::VoltConfig;
+use config::{Route, VoltConfig};
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 
@@ -37,13 +37,32 @@ enum Commands {
     Pull,
     /// Run build with caching
     Run,
+    /// Server management
+    Server {
+        #[command(subcommand)]
+        command: Server,
+    },
+}
+
+#[derive(Subcommand)]
+enum Server {
+    /// Add a new server
+    Add,
+    /// Remove an existing server
+    Remove,
+    /// List all configured servers
+    List,
+    /// Test connection to a server
+    Test,
+    /// Display detailed information about a server
+    Info,
 }
 
 mod app {
-    use super::{Client, Result, VoltConfig};
+    use super::*;
 
-    pub fn create_client(config: &VoltConfig) -> Result<Client> {
-        config.server()?;
+    pub fn create_client(config: &mut VoltConfig) -> Result<Client> {
+        config.load_servers()?;
         Ok(Client::builder().build()?)
     }
 
@@ -68,14 +87,21 @@ mod app {
 async fn main() -> Result<ExitCode> {
     let cli = Cli::parse();
 
-    let config = VoltConfig::new(cli.path).init()?;
-    let client = app::create_client(&config)?;
+    let mut config = VoltConfig::new(cli.path).init()?;
+    let client = app::create_client(&mut config)?;
     let services = Services::new(config, client);
 
     match cli.command.unwrap_or(Commands::Run) {
         Commands::Push => services.push_cache().await?,
         Commands::Pull => services.pull_cache().await?,
         Commands::Run => services.run_build().await?,
+        Commands::Server { command } => match command {
+            Server::Add => ExitCode::SUCCESS,
+            Server::Remove => ExitCode::SUCCESS,
+            Server::List => ExitCode::SUCCESS,
+            Server::Test => ExitCode::SUCCESS,
+            Server::Info => ExitCode::SUCCESS,
+        },
     };
 
     Ok(ExitCode::SUCCESS)
@@ -86,8 +112,7 @@ impl Services {
 
     pub async fn pull_cache(&self) -> Result<ExitCode> {
         let start = Instant::now();
-        let (token, server) = self.config.server()?;
-        let url = format!("{}://{}/pull/{}", if self.config.settings.tls { "https" } else { "http" }, server, self.config.volt_id);
+        let (url, header) = self.config.get_server(Route::Pull)?;
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")
@@ -97,7 +122,7 @@ impl Services {
         pb.set_style(style);
         pb.enable_steady_tick(std::time::Duration::from_millis(80));
 
-        let response = match self.client.get(&url).header("Authorization", format!("Bearer {}", token)).send().await {
+        let response = match self.client.get(&url).header("Authorization", header).send().await {
             Ok(next) => next,
             Err(_) => {
                 pb.finish_and_clear();
@@ -131,8 +156,8 @@ impl Services {
     }
 
     pub async fn push_cache(&self) -> Result<ExitCode> {
-        let (token, server) = self.config.server()?;
-        let url = format!("{}://{}/push/{}", if self.config.settings.tls { "https" } else { "http" }, server, self.config.volt_id);
+        let start = Instant::now();
+        let (url, header) = self.config.get_server(Route::Push)?;
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")
@@ -163,7 +188,7 @@ impl Services {
         let compressed = encoder.finish()?;
         let length = app::format_size(compressed.len());
 
-        let response = match self.client.post(&url).header("Authorization", format!("Bearer {}", token)).body(compressed).send().await {
+        let response = match self.client.post(&url).header("Authorization", header).body(compressed).send().await {
             Ok(next) => next,
             Err(_) => {
                 pb.finish_and_clear();
@@ -178,7 +203,7 @@ impl Services {
             return Err(anyhow!(response.status()));
         }
 
-        pb.finish_with_message(format!("Cached {} of files", length.bright_cyan()));
+        pb.finish_with_message(format!("Cached {} in {}", length.bright_cyan(), format!("{:.2?}", start.elapsed()).green()));
         Ok(ExitCode::SUCCESS)
     }
 
