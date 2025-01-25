@@ -29,5 +29,6 @@ macro_rules! create_symbols {
 create_symbols! {
     BOLT: yellow->"⚡",
     FAIL: red->"✖",
+    WARN: yellow->"!",
     OK: green->"✓",
 }

@@ -84,6 +84,7 @@ async fn main() -> Result<ExitCode> {
     print_startup_message(&addr, &config);
 
     let app = Router::new()
+        .route("/health/{volt_id}", get(health))
         .route("/push/{volt_id}", post(push))
         .route("/pull/{volt_id}", get(pull))
         .layer(middleware::from_fn(logging_middleware))
@@ -118,6 +119,8 @@ fn print_startup_message(addr: &SocketAddr, config: &ServerConfig) {
         pad_line("authentication:   always on"),
     );
 }
+
+async fn health(Path(volt_id): Path<String>) -> String { volt_id }
 
 async fn push(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, body: Body) -> Result<(), StatusCode> {
     uuid::Uuid::parse_str(&volt_id).map_err(|e| {

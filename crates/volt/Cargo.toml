@@ -11,6 +11,8 @@ path = "cli.rs"
 [dependencies]
 tar = "0.4.43"
 home = "0.5.11"
+whoami = "1.5.2"
+inquire = "0.7.5"
 colored = "3.0.0"
 indicatif = "0.17.9"
 

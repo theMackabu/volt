@@ -1,4 +1,4 @@
-use crate::colors;
+use crate::{colors, helpers::parse_server};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::PathBuf, process};
@@ -13,6 +13,7 @@ pub type Servers = BTreeMap<String, Server>;
 pub enum Route {
     Push,
     Pull,
+    Health,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -21,10 +22,10 @@ pub struct VoltConfig {
     pub settings: Config,
 
     #[serde(skip)]
-    path: PathBuf,
+    pub path: PathBuf,
 
     #[serde(skip)]
-    servers: Servers,
+    pub servers: Servers,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -70,6 +71,7 @@ impl VoltConfig {
         let route = match route {
             Route::Push => "push",
             Route::Pull => "pull",
+            Route::Health => "health",
         };
 
         let tls = if server.tls { "https" } else { "http" };
@@ -77,6 +79,25 @@ impl VoltConfig {
         let header = server.token.as_ref().map_or_else(|| String::new(), |t| format!("Bearer {}", t));
 
         Ok((url, header))
+    }
+
+    pub fn get_servers(&self) -> Result<PathBuf> {
+        match home::home_dir() {
+            Some(mut path) => {
+                path.push(".volt");
+                path.push("servers");
+
+                if !path.exists() {
+                    fs::create_dir_all(&path)?;
+                }
+
+                return Ok(path);
+            }
+            None => {
+                eprintln!("{} Impossible to get your home directory", colors::FAIL);
+                process::exit(0);
+            }
+        }
     }
 
     pub fn load_servers(&mut self) -> Result<()> {
@@ -125,42 +146,4 @@ impl VoltConfig {
         println!("📝 Loaded Volt Config\n🚀 Volt is ready!");
         current_toml.try_into().map_err(Into::into)
     }
-
-    fn get_servers(&self) -> Result<PathBuf> {
-        match home::home_dir() {
-            Some(mut path) => {
-                path.push(".volt");
-                path.push("servers");
-
-                if !path.exists() {
-                    fs::create_dir_all(&path)?;
-                }
-
-                return Ok(path);
-            }
-            None => {
-                eprintln!("{} Impossible to get your home directory", colors::FAIL);
-                process::exit(0);
-            }
-        }
-    }
-}
-
-fn parse_server(line: &str) -> Result<Server> {
-    let line = line.trim();
-    if line.is_empty() {
-        return Err(anyhow!("Empty server line"));
-    }
-
-    let (tls_prefix, rest) = line.split_once("://").unwrap_or(("", line));
-    let tls = tls_prefix == "tls";
-    let rest = if tls { rest } else { line };
-
-    let (token, address) = rest.split_once('@').map_or((None, rest), |(t, a)| (Some(t), a));
-
-    Ok(Server {
-        tls,
-        address: address.to_string(),
-        token: token.map(ToString::to_string),
-    })
 }
