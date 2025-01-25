@@ -9,7 +9,7 @@ use axum::{
 };
 
 use tokio::{
-    fs::{create_dir_all, File},
+    fs::{self, create_dir_all, File},
     io::{AsyncWriteExt, BufWriter},
     net::TcpListener,
 };
@@ -122,7 +122,7 @@ fn print_startup_message(addr: &SocketAddr, config: &ServerConfig) {
 
 async fn health(Path(volt_id): Path<String>) -> String { volt_id }
 
-async fn push(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, body: Body) -> Result<(), StatusCode> {
+async fn push(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, headers: HeaderMap, body: Body) -> Result<(), StatusCode> {
     uuid::Uuid::parse_str(&volt_id).map_err(|e| {
         warn!("Invalid UUID format: {}", e);
         StatusCode::BAD_REQUEST
@@ -159,14 +159,34 @@ async fn push(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, b
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    let hash = headers.get("X-Volt-Hash").and_then(|h| h.to_str().ok()).unwrap_or_default();
+    let hash_path = state.config.cache_dir.join(format!("{}.hash", volt_id));
+
+    fs::write(hash_path, hash).await.map_err(|e| {
+        error!("Failed to write hash file: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     Ok(())
 }
 
-async fn pull(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, StatusCode> {
+async fn pull(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, headers: HeaderMap) -> Result<impl IntoResponse, StatusCode> {
     uuid::Uuid::parse_str(&volt_id).map_err(|e| {
         warn!("Invalid UUID format: {}", e);
         StatusCode::BAD_REQUEST
     })?;
+
+    let client_hash = headers.get("X-Volt-Hash").and_then(|h| h.to_str().ok());
+    let server_hash_path = state.config.cache_dir.join(format!("{}.hash", volt_id));
+    let server_hash = tokio::fs::read_to_string(&server_hash_path).await.ok();
+
+    info!("{client_hash:?} to {server_hash:?}");
+
+    if let (Some(client_hash), Some(server_hash)) = (client_hash, server_hash) {
+        if client_hash == server_hash.trim() {
+            return Ok(StatusCode::NOT_MODIFIED.into_response());
+        }
+    }
 
     let file_path = state.config.cache_dir.join(format!("{}.zst", volt_id));
     let file = File::open(&file_path).await.map_err(|e| {
@@ -183,5 +203,5 @@ async fn pull(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>) -
     let mut headers = HeaderMap::new();
     headers.insert("Content-Encoding", "zstd".parse().unwrap());
 
-    Ok((headers, Body::from_stream(stream)))
+    Ok((headers, Body::from_stream(stream)).into_response())
 }

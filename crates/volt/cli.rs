@@ -1,4 +1,5 @@
 mod colors;
+mod hash;
 mod helpers;
 
 #[path = "config/config.rs"]
@@ -10,7 +11,7 @@ use colored::Colorize;
 use config::{Route, VoltConfig};
 use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{validator::Validation, Confirm, CustomType, Password, PasswordDisplayMode, Text};
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 
 use std::{
     fs,
@@ -108,6 +109,7 @@ impl Services {
     pub async fn pull_cache(&self) -> Result<ExitCode> {
         let start = Instant::now();
         let (url, header) = self.config.get_server(Route::Pull)?;
+        let hash = hash::compute_cache(&self.config.settings.cache)?;
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")
@@ -117,13 +119,18 @@ impl Services {
         pb.set_style(style);
         pb.enable_steady_tick(std::time::Duration::from_millis(80));
 
-        let response = match self.client.get(&url).header("Authorization", header).send().await {
+        let response = match self.client.get(&url).header("Authorization", header).header("X-Volt-Hash", hash).send().await {
             Ok(next) => next,
             Err(_) => {
                 pb.finish_and_clear();
                 return Err(anyhow!("unable to connect, is the server up?"));
             }
         };
+
+        if response.status() == StatusCode::NOT_MODIFIED {
+            pb.finish_with_message("Cache is up to date");
+            return Ok(ExitCode::SUCCESS);
+        }
 
         if !response.status().is_success() {
             pb.finish_and_clear();
@@ -153,6 +160,7 @@ impl Services {
     pub async fn push_cache(&self) -> Result<ExitCode> {
         let start = Instant::now();
         let (url, header) = self.config.get_server(Route::Push)?;
+        let hash = hash::compute_cache(&self.config.settings.cache)?;
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")
@@ -183,7 +191,7 @@ impl Services {
         let compressed = encoder.finish()?;
         let length = helpers::format_size(compressed.len());
 
-        let response = match self.client.post(&url).header("Authorization", header).body(compressed).send().await {
+        let response = match self.client.post(&url).header("Authorization", header).header("X-Volt-Hash", hash).body(compressed).send().await {
             Ok(next) => next,
             Err(_) => {
                 pb.finish_and_clear();
@@ -274,7 +282,7 @@ impl Services {
             .to_string();
 
         let port = CustomType::<u16>::new("What port is the server using?")
-            .with_help_message("Typically 443 for TLS, 80 for plain HTTP")
+            .with_help_message("Typically 443 for TLS, 80 for plain TCP")
             .with_error_message("Please enter a valid port (1-65535)")
             .with_default(443)
             .prompt()?;
@@ -310,7 +318,7 @@ impl Services {
             );
         }
 
-        let protocol = if tls { "tls://" } else { "http://" };
+        let protocol = if tls { "tls://" } else { "" };
         let auth_part = token.as_ref().map_or(String::new(), |t| format!("{}@", t));
         let url = format!("{}{}{}:{}", protocol, auth_part, address, port);
 
