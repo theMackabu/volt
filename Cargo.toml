@@ -1,9 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-   "crates/volt",
-   "crates/volt-server"
-]
+members = ["crates/volt", "crates/volt-server"]
 
 [workspace.package]
 license = "MIT"
@@ -16,9 +13,9 @@ opt-level = 3
 codegen-units = 1
 
 [workspace.dependencies]
-toml = "0.8.19"
-anyhow = "1.0.95"
+toml = "0.9.0"
+anyhow = "1.0.98"
 
-uuid = { version = "1.12.1", features = ["v4"] }
-tokio = { version = "1.43.0", features = ["full"] }
-serde = { version = "1.0.217", features = ["derive"] }
+uuid = { version = "1.17.0", features = ["v4"] }
+tokio = { version = "1.46.1", features = ["full"] }
+serde = { version = "1.0.219", features = ["derive"] }
