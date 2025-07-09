@@ -113,8 +113,6 @@ impl Services {
         let hash_dirs = self.config.settings.hash.as_ref().unwrap_or(&self.config.settings.cache);
         let hash = hash::compute_cache(hash_dirs)?;
 
-        println!("{hash} {hash_dirs:?}");
-
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")
             .unwrap()
@@ -167,8 +165,6 @@ impl Services {
 
         let hash_dirs = self.config.settings.hash.as_ref().unwrap_or(&self.config.settings.cache);
         let hash = hash::compute_cache(hash_dirs)?;
-
-        println!("{hash} {hash_dirs:?}");
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")

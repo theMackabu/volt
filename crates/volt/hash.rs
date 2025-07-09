@@ -1,8 +1,6 @@
-use ahash::AHasher;
 use merkle_hash::{Algorithm, MerkleTree};
 use rayon::prelude::*;
-use std::hash::Hasher;
-use std::{path::Path, time::UNIX_EPOCH};
+use std::{collections::hash_map::DefaultHasher, hash::Hasher, path::Path, time::UNIX_EPOCH};
 
 const SAMPLE_RATE: f32 = 0.1;
 const CHUNK_SIZE: usize = 64 * 1024;
@@ -27,13 +25,13 @@ fn bytes_to_hex(bytes: impl AsRef<[u8]>) -> String {
 
 #[inline]
 fn should_sample(path: &Path) -> bool {
-    let mut hasher = AHasher::default();
+    let mut hasher = DefaultHasher::new();
     hasher.write(path.as_os_str().as_encoded_bytes());
     (hasher.finish() as f32 / u64::MAX as f32) < SAMPLE_RATE
 }
 
 #[inline]
-fn hash_metadata(hasher: &mut AHasher, path: &Path) {
+fn hash_metadata(hasher: &mut DefaultHasher, path: &Path) {
     hasher.write(path.as_os_str().as_encoded_bytes());
 
     if let Ok(metadata) = std::fs::metadata(path) {
@@ -45,7 +43,7 @@ fn hash_metadata(hasher: &mut AHasher, path: &Path) {
 }
 
 #[inline]
-fn hash_file_sample(hasher: &mut AHasher, path: &Path) {
+fn hash_file_sample(hasher: &mut DefaultHasher, path: &Path) {
     if let Ok(mut file) = std::fs::File::open(path) {
         let mut buffer = vec![0u8; CHUNK_SIZE];
         if let Ok(bytes_read) = std::io::Read::read(&mut file, &mut buffer) {
@@ -121,7 +119,7 @@ fn compute_cache_sampling(dirs: &[String]) -> Result<String, std::io::Error> {
     let hashes: Vec<u64> = all_files
         .par_iter()
         .map(|path| {
-            let mut hasher = AHasher::default();
+            let mut hasher = DefaultHasher::new();
 
             hash_metadata(&mut hasher, path);
 

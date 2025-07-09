@@ -5,4 +5,4 @@ server = "ampere"
 wrap = "cargo build --release"
 
 cache = ["target"]
-hash = ["crates/volt", "crates/volt-server", "Cargo.toml", "Cargo.lock"]
+hash = ["crates", "Cargo.toml", "Cargo.lock"]
