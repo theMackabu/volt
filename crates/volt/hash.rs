@@ -76,6 +76,33 @@ fn compute_cache_merkle(dir: &str) -> Result<String, std::io::Error> {
     }
 }
 
+fn compute_cache_merkle_multi(dirs: &[String]) -> Result<String, std::io::Error> {
+    let mut merkle_hashes = Vec::new();
+
+    for dir in dirs {
+        let hash = compute_cache_merkle(dir)?;
+        merkle_hashes.push(hash);
+    }
+
+    merkle_hashes.sort();
+    let mut result = String::with_capacity(64);
+
+    for i in 0..4 {
+        let combined = merkle_hashes.iter().fold(0u64, |acc, hash_str| {
+            let truncated_hash = if hash_str.len() > 16 { &hash_str[..16] } else { hash_str };
+            let hash_val = u64::from_str_radix(truncated_hash, 16).unwrap_or(0);
+            acc ^ hash_val.wrapping_add(i)
+        });
+
+        for shift in (0..64).step_by(4).rev() {
+            let nibble = (combined >> shift) & 0xf;
+            result.push(if nibble < 10 { (b'0' + nibble as u8) as char } else { (b'a' + (nibble - 10) as u8) as char });
+        }
+    }
+
+    Ok(result)
+}
+
 fn compute_cache_sampling(dirs: &[String]) -> Result<String, std::io::Error> {
     let mut all_files = Vec::new();
 
@@ -119,15 +146,13 @@ pub fn compute_cache(dirs: &[String]) -> Result<String, std::io::Error> {
     }
 
     if dirs.len() == 1 {
-        let dir = &dirs[0];
-        let file_count = count_files_in_dir(dir);
-
-        if file_count <= MERKLE_TREE_THRESHOLD {
-            return compute_cache_merkle(dir);
-        } else {
-            return compute_cache_sampling(dirs);
-        }
+        return compute_cache_merkle(&dirs[0]);
     }
 
-    compute_cache_sampling(dirs)
+    let total_files: usize = dirs.iter().map(|d| count_files_in_dir(d)).sum();
+
+    match total_files <= MERKLE_TREE_THRESHOLD {
+        true => compute_cache_merkle_multi(dirs),
+        false => compute_cache_sampling(dirs),
+    }
 }
