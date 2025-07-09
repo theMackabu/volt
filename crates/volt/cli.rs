@@ -46,6 +46,9 @@ enum Commands {
     /// Run build with caching
     #[command(visible_alias = "start", visible_alias = "r")]
     Run,
+    /// Check remote cache status
+    #[command(visible_alias = "test", visible_alias = "c")]
+    Check,
     /// Server management
     #[command(visible_alias = "srv", visible_alias = "s")]
     Server {
@@ -91,6 +94,7 @@ async fn main() -> Result<ExitCode> {
         Commands::Push => services.push_cache().await?,
         Commands::Pull => services.pull_cache().await?,
         Commands::Run => services.run_build().await?,
+        Commands::Check => services.check_status().await?,
         Commands::Server { command } => match command.unwrap_or(Server::New) {
             Server::New => services.server_add().await?,
             Server::List => services.server_list().await?,
@@ -105,6 +109,30 @@ async fn main() -> Result<ExitCode> {
 
 impl Services {
     pub fn new(config: VoltConfig, client: Client) -> Self { Self { config, client } }
+
+    pub async fn check_hash(&self, hash: &str) -> Result<bool> {
+        let (url, header) = self.config.get_server(Route::Check)?;
+
+        let response = match self.client.get(&url).header("Authorization", header).header("X-Volt-Hash", hash).send().await {
+            Ok(next) => next,
+            Err(_) => return Ok(false),
+        };
+
+        Ok(response.status() == StatusCode::NOT_MODIFIED)
+    }
+
+    pub async fn check_status(&self) -> Result<ExitCode> {
+        let hash_dirs = self.config.settings.hash.as_ref().unwrap_or(&self.config.settings.cache);
+        let hash = hash::compute_cache(hash_dirs)?;
+
+        if self.check_hash(&hash).await? {
+            println!("{} Cache exists on server", colors::OK);
+            return Ok(ExitCode::SUCCESS);
+        }
+
+        println!("{} Files currently uncached", colors::WARN);
+        return Ok(ExitCode::FAILURE);
+    }
 
     pub async fn pull_cache(&self) -> Result<ExitCode> {
         let start = Instant::now();
@@ -173,6 +201,12 @@ impl Services {
 
         pb.set_style(style);
         pb.enable_steady_tick(Duration::from_millis(80));
+
+        if self.check_hash(&hash).await? {
+            pb.finish_with_message("Skipping cache push");
+            return Ok(ExitCode::SUCCESS);
+        }
+
         pb.set_message("Creating archive...");
 
         let mut buffer = Vec::new();

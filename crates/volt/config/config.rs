@@ -14,6 +14,7 @@ pub enum Route {
     Push,
     Pull,
     Health,
+    Check,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -73,6 +74,7 @@ impl VoltConfig {
             Route::Push => "push",
             Route::Pull => "pull",
             Route::Health => "health",
+            Route::Check => "check",
         };
 
         let tls = if server.tls { "https" } else { "http" };

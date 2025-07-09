@@ -1,15 +1,15 @@
 use axum::{
+    Router,
     body::Body,
     extract::{Path, State},
     http::{HeaderMap, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
-    Router,
 };
 
 use tokio::{
-    fs::{self, create_dir_all, File},
+    fs::{self, File, create_dir_all},
     io::{AsyncWriteExt, BufWriter},
     net::TcpListener,
 };
@@ -87,6 +87,7 @@ async fn main() -> Result<ExitCode> {
         .route("/health/{volt_id}", get(health))
         .route("/push/{volt_id}", post(push))
         .route("/pull/{volt_id}", get(pull))
+        .route("/check/{volt_id}", get(check_hash))
         .layer(middleware::from_fn(logging_middleware))
         .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
         .with_state(state);
@@ -121,6 +122,34 @@ fn print_startup_message(addr: &SocketAddr, config: &ServerConfig) {
 }
 
 async fn health(Path(volt_id): Path<String>) -> String { volt_id }
+
+async fn check_hash(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, headers: HeaderMap) -> Result<impl IntoResponse, StatusCode> {
+    uuid::Uuid::parse_str(&volt_id).map_err(|e| {
+        warn!("Invalid UUID format: {}", e);
+        StatusCode::BAD_REQUEST
+    })?;
+
+    let client_hash = headers.get("X-Volt-Hash").and_then(|h| h.to_str().ok());
+    let server_hash_path = state.config.cache_dir.join(format!("{volt_id}.hash"));
+    let server_hash = tokio::fs::read_to_string(&server_hash_path).await.ok();
+
+    info!("Hash check: client={client_hash:?} server={server_hash:?}");
+
+    match (client_hash, server_hash) {
+        (Some(client_hash), Some(server_hash)) => {
+            if client_hash == server_hash.trim() {
+                Ok(StatusCode::NOT_MODIFIED.into_response())
+            } else {
+                Ok(StatusCode::OK.into_response())
+            }
+        }
+        (_, None) => Ok(StatusCode::NOT_FOUND.into_response()),
+        (None, _) => {
+            warn!("Missing X-Volt-Hash header");
+            Err(StatusCode::BAD_REQUEST)
+        }
+    }
+}
 
 async fn push(Path(volt_id): Path<String>, State(state): State<Arc<AppState>>, headers: HeaderMap, body: Body) -> Result<(), StatusCode> {
     uuid::Uuid::parse_str(&volt_id).map_err(|e| {
