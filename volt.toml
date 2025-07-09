@@ -2,7 +2,5 @@ volt_id = "eb982eb8-8638-4e19-b6fe-978d3bc41449"
 
 [settings]
 server = "ampere"
-wrap = "cargo build --release"
-
 cache = ["target"]
-hash = ["crates", "Cargo.toml", "Cargo.lock"]
+wrap = "cargo build --release"
