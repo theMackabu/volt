@@ -31,3 +31,4 @@ uuid.workspace = true
 tokio.workspace = true
 serde.workspace = true
 anyhow.workspace = true
+merkle_hash = "3.8.0"

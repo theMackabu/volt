@@ -3,4 +3,6 @@ volt_id = "{volt_id}"
 [settings]
 # server = "name"
 # cache = ["target"]
+# optional: directories to hash for cache validation (defaults to cache dirs)
+# hash = ["src", "Cargo.toml", "Cargo.lock"]
 # wrap = "cargo build --release"

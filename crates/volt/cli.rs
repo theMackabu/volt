@@ -5,12 +5,12 @@ mod helpers;
 #[path = "config/config.rs"]
 mod config;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use config::{Route, VoltConfig};
 use indicatif::{ProgressBar, ProgressStyle};
-use inquire::{validator::Validation, Confirm, CustomType, Password, PasswordDisplayMode, Text};
+use inquire::{Confirm, CustomType, Password, PasswordDisplayMode, Text, validator::Validation};
 use reqwest::{Client, StatusCode};
 
 use std::{
@@ -109,7 +109,11 @@ impl Services {
     pub async fn pull_cache(&self) -> Result<ExitCode> {
         let start = Instant::now();
         let (url, header) = self.config.get_server(Route::Pull)?;
-        let hash = hash::compute_cache(&self.config.settings.cache)?;
+
+        let hash_dirs = self.config.settings.hash.as_ref().unwrap_or(&self.config.settings.cache);
+        let hash = hash::compute_cache(hash_dirs)?;
+
+        println!("{hash} {hash_dirs:?}");
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")
@@ -160,7 +164,11 @@ impl Services {
     pub async fn push_cache(&self) -> Result<ExitCode> {
         let start = Instant::now();
         let (url, header) = self.config.get_server(Route::Push)?;
-        let hash = hash::compute_cache(&self.config.settings.cache)?;
+
+        let hash_dirs = self.config.settings.hash.as_ref().unwrap_or(&self.config.settings.cache);
+        let hash = hash::compute_cache(hash_dirs)?;
+
+        println!("{hash} {hash_dirs:?}");
 
         let pb = ProgressBar::new_spinner();
         let style = ProgressStyle::with_template("\n{spinner:.green} {msg}")

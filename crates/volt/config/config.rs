@@ -1,5 +1,5 @@
 use crate::{colors, helpers::parse_server};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::PathBuf, process};
 use toml::Value;
@@ -33,6 +33,7 @@ pub struct Config {
     pub server: String,
     pub cache: Vec<String>,
     pub wrap: String,
+    pub hash: Option<Vec<String>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
