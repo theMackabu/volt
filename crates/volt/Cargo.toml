@@ -24,7 +24,10 @@ indicatif = "0.18.0"
 
 zstd = { version = "0.13.3", features = ["zstdmt"] }
 clap = { version = "4.5.40", features = ["derive"] }
-reqwest = { version = "0.12.22", features = ["json"] }
+reqwest = { version = "0.12.22", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }
 
 toml.workspace = true
 uuid.workspace = true
